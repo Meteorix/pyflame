@@ -37,6 +37,7 @@
 #include "./ptrace.h"
 #include "./pyfrob.h"
 #include "./symbol.h"
+#include "./unwind.h"
 
 // why would this not be true idk
 static_assert(sizeof(long) == sizeof(void *), "wat platform r u on");
@@ -324,6 +325,41 @@ std::vector<Thread> GetThreads(pid_t pid, PyAddresses addrs,
     std::vector<Frame> stack;
     if (frame_addr != 0) {
       FollowFrame(pid, frame_addr, &stack);
+
+      // follow c frames
+      unw_addr_space_t as = unw_create_addr_space(&_UPT_accessors, 0);
+
+      void *context = _UPT_create(pid);
+      unw_cursor_t cursor;
+      int r = unw_init_remote(&cursor, as, context);
+      if (r != 0){
+        //printf("unw_init_remote:%d\n", r);
+        std::cerr << "ERROR: cannot initialize cursor for remote unwinding\n";
+      }
+
+      do {
+        unw_word_t offset, pc;
+        char sym[4096];
+        if (unw_get_reg(&cursor, UNW_REG_IP, &pc)){
+          std::cerr << "ERROR: cannot read program counter\n";
+        }
+
+        // printf("0x%lx: ", pc);
+        std::string filename = string_format("0x%lx", pc);  // actually it is the address
+        std::string name = string_format("%s", sym);
+        size_t line = 0;  //(size_t)offset;  // actually it is the inmemory offset
+
+        if (unw_get_proc_name(&cursor, sym, sizeof(sym), &offset) == 0){
+          // printf("(%s+0x%lx)\n", sym, offset);
+          stack.push_back({"0xcframe", name, line});
+        }
+        else{
+          printf("-- no symbol name found\n");
+        }
+
+      } while (unw_step(&cursor) > 0);
+      _UPT_destroy(context);
+
       threads.push_back(Thread(id, is_current, stack));
     }
 
