@@ -63,6 +63,7 @@ class Prober {
   bool include_ts_;
   bool include_line_number_;
   bool enable_threads_;
+  bool profile_c_stack_;
   double seconds_;
   double sample_rate_;
   std::chrono::microseconds interval_;

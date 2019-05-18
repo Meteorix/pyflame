@@ -40,6 +40,9 @@
 #include "./symbol.h"
 #include "./thread.h"
 
+#include <libunwind-ptrace.h>
+#include <stdarg.h>  // For va_start, etc.
+
 // Microseconds in a second.
 static const char usage_str[] =
     ("Usage: pyflame [options] [-p] PID\n"
@@ -110,6 +113,28 @@ static inline bool EndsWith(std::string const &value,
 namespace pyflame {
 
 typedef std::unordered_map<frames_t, size_t, FrameHash> buckets_t;
+
+
+std::string string_format(const std::string fmt, ...) {
+    int size = ((int)fmt.size()) * 2 + 50;   // Use a rubric appropriate for your code
+    std::string str;
+    va_list ap;
+    while (1) {     // Maximum two passes on a POSIX system...
+        str.resize(size);
+        va_start(ap, fmt);
+        int n = vsnprintf((char *)str.data(), size, fmt.c_str(), ap);
+        va_end(ap);
+        if (n > -1 && n < size) {  // Everything worked
+            str.resize(n);
+            return str;
+        }
+        if (n > -1)  // Needed size returned
+            size = n + 1;   // For null char
+        else
+            size *= 2;      // Guess at a larger size (OS specific)
+    }
+    return str;
+}
 
 // Prints all stack traces
 static void PrintFrames(std::ostream &out,
@@ -183,7 +208,7 @@ static void PrintFramesTS(std::ostream &out,
 }
 
 int Prober::ParseOpts(int argc, char **argv) {
-  static const char short_opts[] = "dhno:p:r:s:tvx";
+  static const char short_opts[] = "dhno:p:r:s:tvxc";
   static struct option long_opts[] = {
     {"abi", required_argument, 0, 'a'},
     {"dump", no_argument, 0, 'd'},
@@ -193,6 +218,7 @@ int Prober::ParseOpts(int argc, char **argv) {
 #if ENABLE_THREADS
     {"threads", no_argument, 0, 'L'},
 #endif
+    {"profile-c-stack", no_argument, 0, 'c'},
     {"no-line-numbers", no_argument, 0, 'n'},
     {"output", required_argument, 0, 'o'},
     {"pid", required_argument, 0, 'p'},
@@ -249,6 +275,9 @@ int Prober::ParseOpts(int argc, char **argv) {
         enable_threads_ = true;
         break;
 #endif
+      case 'c':
+        profile_c_stack_ = true;
+        break;
       case 'p':
         if ((pid_ = ParsePid(optarg)) == -1) {
           return 1;
@@ -413,7 +442,57 @@ int Prober::ProbeLoop(const PyFrob &frobber, std::ostream *out) {
       // Only true for non-GIL stacks that we couldn't find a way to profile
       // Currently this means stripped builds on non-AMD64 archs
       if (threads.empty() && include_idle_) {
-        idle_count++;
+        if (!profile_c_stack_){
+          idle_count++;
+        }
+        else{
+          // profile c stack when idle
+          std::vector<Frame> c_stack;
+
+          unw_addr_space_t as = unw_create_addr_space(&_UPT_accessors, 0);
+          void *context = _UPT_create(pid_);
+          unw_cursor_t cursor;
+          int r = unw_init_remote(&cursor, as, context);
+          if (r != 0){
+            printf("unw_init_remote:%d\n", r);
+            std::cerr << "ERROR: cannot initialize cursor for remote unwinding\n";
+            return_code = 1;
+            goto finish;
+          }
+          do {
+            unw_word_t offset, pc;
+            char sym[4096];
+            if (unw_get_reg(&cursor, UNW_REG_IP, &pc)){
+              std::cerr << "ERROR: cannot read program counter\n";
+              return_code = 1;
+              goto finish;
+            }
+
+            printf("0x%lx: ", pc);
+            std::string filename = string_format("0x%lx", pc);
+            std::string name = string_format("%s", sym);
+            size_t line = (size_t)offset;
+
+            if (unw_get_proc_name(&cursor, sym, sizeof(sym), &offset) == 0){
+              printf("(%s+0x%lx)\n", sym, offset);
+              c_stack.push_back({filename, name, line});
+            }
+            else{
+              printf("-- no symbol name found\n");
+              // mark as idle if no symbol name found
+              idle_count++;
+            }
+
+          } while (unw_step(&cursor) > 0);
+          _UPT_destroy(context);
+
+          if (!c_stack.empty()){
+            Thread c_thread = Thread(0, true, c_stack);
+            threads.push_back(c_thread);
+          }
+        }
+        // end profile c stack
+
         // Timestamp empty call stacks only if required. Since lots of time the
         // process will be idle, this is a good optimization to have.
         if (include_ts_) {
