@@ -425,47 +425,13 @@ int Prober::ProbeLoop(const PyFrob &frobber, std::ostream *out) {
         else{
           // profile c stack when idle
           std::vector<Frame> c_stack;
-
-          unw_addr_space_t as = unw_create_addr_space(&_UPT_accessors, 0);
-          void *context = _UPT_create(pid_);
-          unw_cursor_t cursor;
-          int r = unw_init_remote(&cursor, as, context);
-          if (r != 0){
-            printf("unw_init_remote:%d\n", r);
-            std::cerr << "ERROR: cannot initialize cursor for remote unwinding\n";
-            return_code = 1;
-            goto finish;
-          }
-          do {
-            unw_word_t offset, pc;
-            char sym[4096];
-            if (unw_get_reg(&cursor, UNW_REG_IP, &pc)){
-              std::cerr << "ERROR: cannot read program counter\n";
-              return_code = 1;
-              goto finish;
-            }
-
-            //printf("0x%lx: ", pc);
-            std::string filename = string_format("0x%lx", pc);
-            std::string name = string_format("%s", sym);
-            size_t line = (size_t)offset;
-
-            if (unw_get_proc_name(&cursor, sym, sizeof(sym), &offset) == 0){
-              //printf("(%s+0x%lx)\n", sym, offset);
-              c_stack.push_back({filename, name, line});
-            }
-            else{
-              //printf("-- no symbol name found\n");
-              // mark as idle if no symbol name found
-              idle_count++;
-            }
-
-          } while (unw_step(&cursor) > 0);
-          _UPT_destroy(context);
+          GetCStack(pid_, &c_stack);
 
           if (!c_stack.empty()){
             Thread c_thread = Thread(0, true, c_stack);
             threads.push_back(c_thread);
+          } else {
+            idle_count++;
           }
         }
         // end profile c stack

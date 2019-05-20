@@ -264,7 +264,7 @@ void FollowFrame(pid_t pid, unsigned long frame, std::vector<Frame> *stack) {
 // N.B. To better understand how this method works, read the implementation of
 // pystate.c in the CPython source code.
 std::vector<Thread> GetThreads(pid_t pid, PyAddresses addrs,
-                               bool enable_threads) {
+                               bool enable_threads, bool enable_cstacks) {
   // Pointer to the current interpreter state. Python has a very rarely used
   // feature called "sub-interpreters", Pyflame only supports profiling a single
   // sub-interpreter.
@@ -326,39 +326,7 @@ std::vector<Thread> GetThreads(pid_t pid, PyAddresses addrs,
     if (frame_addr != 0) {
       FollowFrame(pid, frame_addr, &stack);
 
-      // follow c frames
-      unw_addr_space_t as = unw_create_addr_space(&_UPT_accessors, 0);
-
-      void *context = _UPT_create(pid);
-      unw_cursor_t cursor;
-      int r = unw_init_remote(&cursor, as, context);
-      if (r != 0){
-        //printf("unw_init_remote:%d\n", r);
-        std::cerr << "ERROR: cannot initialize cursor for remote unwinding\n";
-      }
-
-      do {
-        unw_word_t offset, pc;
-        char sym[4096];
-        if (unw_get_reg(&cursor, UNW_REG_IP, &pc)){
-          std::cerr << "ERROR: cannot read program counter\n";
-        }
-
-        // printf("0x%lx: ", pc);
-        std::string filename = string_format("0x%lx", pc);  // actually it is the address
-        std::string name = string_format("%s", sym);
-        size_t line = 0;  //(size_t)offset;  // actually it is the inmemory offset
-
-        if (unw_get_proc_name(&cursor, sym, sizeof(sym), &offset) == 0){
-          // printf("(%s+0x%lx)\n", sym, offset);
-          stack.push_back({"0xcframe", name, line});
-        }
-        else{
-          printf("-- no symbol name found\n");
-        }
-
-      } while (unw_step(&cursor) > 0);
-      _UPT_destroy(context);
+      GetCStack(pid, &stack);
 
       threads.push_back(Thread(id, is_current, stack));
     }
