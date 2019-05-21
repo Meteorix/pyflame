@@ -63,5 +63,18 @@ void GetCStack(pid_t pid, std::vector<Frame> *stack){
   _UPT_destroy(context);
 }
 
+void MergeStack(std::vector<Frame> *stack, std::vector<Frame> *py_stack, std::vector<Frame> *c_stack){
+  auto cur_py_stack = py_stack->begin();
+
+  for (auto cur_c_stack = c_stack->begin(); cur_c_stack != c_stack->end(); cur_c_stack++){
+    if (cur_c_stack->name() != "_PyEval_EvalFrameDefault"){
+      stack->push_back(*cur_c_stack);
+    } else {
+      stack->push_back(*cur_py_stack);
+    }
+  }
+
+}
+
 
 }  // namespace pyflame

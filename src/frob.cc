@@ -323,10 +323,12 @@ std::vector<Thread> GetThreads(pid_t pid, PyAddresses addrs,
         PtracePeek(pid, tstate + offsetof(PyThreadState, frame)));
 
     std::vector<Frame> stack;
+    std::vector<Frame> py_stack;
+    std::vector<Frame> c_stack;
     if (frame_addr != 0) {
-      FollowFrame(pid, frame_addr, &stack);
-
-      GetCStack(pid, &stack);
+      FollowFrame(pid, frame_addr, &py_stack);
+      GetCStack(pid, &c_stack);
+      MergeStack(&stack, &py_stack, &c_stack);
 
       threads.push_back(Thread(id, is_current, stack));
     }
