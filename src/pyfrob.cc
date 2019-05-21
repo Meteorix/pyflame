@@ -27,7 +27,7 @@
 
 #define FROB_FUNCS                                            \
   std::vector<Thread> GetThreads(pid_t pid, PyAddresses addr, \
-                                 bool enable_threads);
+                                 bool enable_threads, bool enable_ctack);
 
 namespace pyflame {
 namespace {
@@ -207,6 +207,6 @@ std::string PyFrob::Status() const {
 }
 
 std::vector<Thread> PyFrob::GetThreads(void) const {
-  return get_threads_(pid_, addrs_, enable_threads_);
+  return get_threads_(pid_, addrs_, enable_threads_, enable_cstack_);
 }
 }  // namespace pyflame

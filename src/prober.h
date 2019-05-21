@@ -52,6 +52,7 @@ class Prober {
   int Run(const PyFrob &frobber);
 
   inline bool enable_threads() const { return enable_threads_; }
+  inline bool enable_cstack() const { return enable_cstack_; }
   inline pid_t pid() const { return pid_; }
 
  private:
@@ -63,7 +64,7 @@ class Prober {
   bool include_ts_;
   bool include_line_number_;
   bool enable_threads_;
-  bool profile_c_stack_;
+  bool enable_cstack_;
   double seconds_;
   double sample_rate_;
   std::chrono::microseconds interval_;

@@ -253,7 +253,7 @@ int Prober::ParseOpts(int argc, char **argv) {
         break;
 #endif
       case 'c':
-        profile_c_stack_ = true;
+        enable_cstack_ = true;
         break;
       case 'p':
         if ((pid_ = ParsePid(optarg)) == -1) {
@@ -419,7 +419,7 @@ int Prober::ProbeLoop(const PyFrob &frobber, std::ostream *out) {
       // Only true for non-GIL stacks that we couldn't find a way to profile
       // Currently this means stripped builds on non-AMD64 archs
       if (threads.empty() && include_idle_) {
-        if (!profile_c_stack_){
+        if (!enable_cstack_){
           idle_count++;
         }
         else{

@@ -57,21 +57,24 @@ void GetCStack(pid_t pid, std::vector<Frame> *stack){
     }
     else{
       printf("-- no symbol name found\n");
+      stack->push_back({"0xcframe", "unknown frame", 0});
     }
 
   } while (unw_step(&cursor) > 0);
   _UPT_destroy(context);
 }
 
-void MergeStack(std::vector<Frame> *stack, std::vector<Frame> *py_stack, std::vector<Frame> *c_stack){
-  auto cur_py_stack = py_stack->begin();
+void MergeStack(std::vector<Frame> *stack, std::vector<Frame> *py_stack, std::vector<Frame> *c_stack, const std::string py_eval_frame){
+  std::vector<Frame>::iterator cur_py_stack = py_stack->begin();
 
   for (auto cur_c_stack = c_stack->begin(); cur_c_stack != c_stack->end(); cur_c_stack++){
-    if (cur_c_stack->name() != "_PyEval_EvalFrameDefault"){
-      stack->push_back(*cur_c_stack);
-    } else {
+    if (cur_c_stack->name() == py_eval_frame){
       stack->push_back(*cur_py_stack);
+      if (cur_py_stack != (py_stack->end() - 1)){
+        cur_py_stack++;
+      }
     }
+    stack->push_back(*cur_c_stack);
   }
 
 }

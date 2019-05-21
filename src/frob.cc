@@ -58,6 +58,8 @@ std::string StringData(pid_t pid, unsigned long addr) {
   return PtracePeekString(pid, ByteData(addr));
 }
 
+const std::string PyEvalFrame = "PyEval_EvalFrameEx";
+
 #elif PYFLAME_PY_VERSION == 34
 namespace py34 {
 std::string StringDataPython3(pid_t pid, unsigned long addr);
@@ -73,6 +75,8 @@ std::string StringData(pid_t pid, unsigned long addr) {
 unsigned long ByteData(unsigned long addr) {
   return addr + offsetof(PyBytesObject, ob_sval);
 }
+
+const std::string PyEvalFrame = "PyEval_EvalFrameEx";
 
 #elif PYFLAME_PY_VERSION == 36
 namespace py36 {
@@ -90,6 +94,8 @@ unsigned long ByteData(unsigned long addr) {
   return addr + offsetof(PyBytesObject, ob_sval);
 }
 
+const std::string PyEvalFrame = "_PyEval_EvalFrameDefault";
+
 #elif PYFLAME_PY_VERSION == 37
 namespace py37 {
 std::string StringDataPython3(pid_t pid, unsigned long addr);
@@ -105,6 +111,8 @@ std::string StringData(pid_t pid, unsigned long addr) {
 unsigned long ByteData(unsigned long addr) {
   return addr + offsetof(PyBytesObject, ob_sval);
 }
+
+const std::string PyEvalFrame = "_PyEval_EvalFrameDefault";
 
 #else
 static_assert(false, "uh oh, bad PYFLAME_PY_VERSION");
@@ -323,12 +331,16 @@ std::vector<Thread> GetThreads(pid_t pid, PyAddresses addrs,
         PtracePeek(pid, tstate + offsetof(PyThreadState, frame)));
 
     std::vector<Frame> stack;
-    std::vector<Frame> py_stack;
-    std::vector<Frame> c_stack;
     if (frame_addr != 0) {
-      FollowFrame(pid, frame_addr, &py_stack);
-      GetCStack(pid, &c_stack);
-      MergeStack(&stack, &py_stack, &c_stack);
+      if (enable_cstacks){
+        std::vector<Frame> py_stack;
+        std::vector<Frame> c_stack;
+        FollowFrame(pid, frame_addr, &py_stack);
+        GetCStack(pid, &c_stack);
+        MergeStack(&stack, &py_stack, &c_stack, PyEvalFrame);
+      } else {
+        FollowFrame(pid, frame_addr, &stack);
+      }
 
       threads.push_back(Thread(id, is_current, stack));
     }
