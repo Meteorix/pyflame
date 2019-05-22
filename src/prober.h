@@ -19,6 +19,7 @@
 
 #include "./pyfrob.h"
 #include "./symbol.h"
+#include "./unwind.h"
 
 // Maximum number of times to retry checking for Python symbols when -p is used.
 #define MAX_ATTACH_RETRIES 1
@@ -54,6 +55,7 @@ class Prober {
   inline bool enable_threads() const { return enable_threads_; }
   inline bool enable_cstack() const { return enable_cstack_; }
   inline pid_t pid() const { return pid_; }
+  inline Unwinder* unwinder() {return &unwinder_;}
 
  private:
   PyABI abi_;
@@ -70,6 +72,7 @@ class Prober {
   std::chrono::microseconds interval_;
   std::string output_file_;
   std::string trace_target_;
+  Unwinder unwinder_;
 
   pid_t ParsePid(const char *pid_str);
 

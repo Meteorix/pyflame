@@ -272,7 +272,8 @@ void FollowFrame(pid_t pid, unsigned long frame, std::vector<Frame> *stack) {
 // N.B. To better understand how this method works, read the implementation of
 // pystate.c in the CPython source code.
 std::vector<Thread> GetThreads(pid_t pid, PyAddresses addrs,
-                               bool enable_threads, bool enable_cstacks) {
+                               bool enable_threads, bool enable_cstacks,
+                               Unwinder* unwinder) {
   // Pointer to the current interpreter state. Python has a very rarely used
   // feature called "sub-interpreters", Pyflame only supports profiling a single
   // sub-interpreter.
@@ -336,8 +337,8 @@ std::vector<Thread> GetThreads(pid_t pid, PyAddresses addrs,
         std::vector<Frame> py_stack;
         std::vector<Frame> c_stack;
         FollowFrame(pid, frame_addr, &py_stack);
-        GetCStack(pid, &c_stack);
-        MergeStack(&stack, &py_stack, &c_stack, PyEvalFrame);
+        unwinder->GetCStack(pid, &c_stack);
+        unwinder->MergeStack(&stack, &py_stack, &c_stack, PyEvalFrame);
       } else {
         FollowFrame(pid, frame_addr, &stack);
       }

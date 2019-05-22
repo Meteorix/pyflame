@@ -411,6 +411,10 @@ int Prober::ProbeLoop(const PyFrob &frobber, std::ostream *out) {
   size_t failed_count = 0;
   bool check_end = seconds_ >= 0;
   auto end = std::chrono::system_clock::now() + ToMicroseconds(seconds_);
+
+  if (enable_cstack_){
+    unwinder_.InitUnwind(pid_);
+  }
   for (;;) {
     auto now = std::chrono::system_clock::now();
     try {
@@ -425,7 +429,7 @@ int Prober::ProbeLoop(const PyFrob &frobber, std::ostream *out) {
         else{
           // profile c stack when idle
           std::vector<Frame> c_stack;
-          GetCStack(pid_, &c_stack);
+          unwinder_.GetCStack(pid_, &c_stack);
 
           if (!c_stack.empty()){
             Thread c_thread = Thread(0, true, c_stack);
@@ -477,6 +481,9 @@ finish:
     } else {
       PrintFramesTS(*out, call_stacks, include_line_number_);
     }
+  }
+  if (enable_cstack_){
+    unwinder_.DestoryUnwind();
   }
   return return_code;
 }

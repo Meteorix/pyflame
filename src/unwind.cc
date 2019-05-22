@@ -24,18 +24,23 @@ std::string string_format(const std::string fmt, ...){
   return str;
 }
 
+void Unwinder::InitUnwind(pid_t pid){
+  unw_as_ = unw_create_addr_space(&_UPT_accessors, 0);
+  unw_context_ = _UPT_create(pid);  // todo: reuse context & as?
+}
 
-void GetCStack(pid_t pid, std::vector<Frame> *stack){
-  // follow c frames
-  unw_addr_space_t as = unw_create_addr_space(&_UPT_accessors, 0);
+void Unwinder::DestoryUnwind(){
+  _UPT_destroy(unw_context_);
+}
 
-  void *context = _UPT_create(pid);  // todo: reuse context & as?
+void Unwinder::GetCStack(pid_t pid, std::vector<Frame> *stack){
+  // get c frames
+
   unw_cursor_t cursor;
-  int r = unw_init_remote(&cursor, as, context);
+  int r = unw_init_remote(&cursor, unw_as_, unw_context_);
   if (r != 0){
     //printf("unw_init_remote:%d\n", r);
     std::cerr << "ERROR: cannot initialize cursor for remote unwinding\n";
-    _UPT_destroy(context);
     return;
   }
 
@@ -53,18 +58,17 @@ void GetCStack(pid_t pid, std::vector<Frame> *stack){
       std::string name = string_format("%s", sym);
       size_t line = 0;  //(size_t)offset;  // actually it is the inmemory offset
       // printf("(%s+0x%lx)\n", sym, offset);
-      stack->push_back({"0xcframe", name, line});
+      stack->push_back({"0xc", name, line});
     }
     else{
       printf("-- no symbol name found\n");
-      stack->push_back({"0xcframe", "unknown frame", 0});
+      stack->push_back({"0xc", "unknown frame", 0});
     }
 
   } while (unw_step(&cursor) > 0);
-  _UPT_destroy(context);
 }
 
-void MergeStack(std::vector<Frame> *stack, std::vector<Frame> *py_stack, std::vector<Frame> *c_stack, const std::string py_eval_frame){
+void Unwinder::MergeStack(std::vector<Frame> *stack, std::vector<Frame> *py_stack, std::vector<Frame> *c_stack, const std::string py_eval_frame){
   std::vector<Frame>::iterator cur_py_stack = py_stack->begin();
 
   for (auto cur_c_stack = c_stack->begin(); cur_c_stack != c_stack->end(); cur_c_stack++){

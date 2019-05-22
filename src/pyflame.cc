@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   if (prober.InitiatePtrace(argv)) {
     return 1;
   }
-  PyFrob frobber(prober.pid(), prober.enable_threads(), prober.enable_cstack());
+  PyFrob frobber(prober.pid(), prober.enable_threads(), prober.enable_cstack(), prober.unwinder());
   if (prober.FindSymbols(&frobber)) {
     return 1;
   }
