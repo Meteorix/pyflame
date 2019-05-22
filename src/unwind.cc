@@ -65,7 +65,7 @@ void Unwinder::GetCStack(pid_t pid, std::vector<Frame> *stack){
       stack->push_back({"0xc", "unknown frame", 0});
     }
 
-  } while (unw_step(&cursor) > 0);
+  } while (unw_step(&cursor) > 0);  // todo: unw_step is too slow
 }
 
 void Unwinder::MergeStack(std::vector<Frame> *stack, std::vector<Frame> *py_stack, std::vector<Frame> *c_stack, const std::string py_eval_frame){
