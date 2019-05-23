@@ -49,6 +49,7 @@ static const char usage_str[] =
      "Common Options:\n"
 #ifdef ENABLE_THREADS
      "  --threads                Enable multi-threading support\n"
+     "  -c, --profile-c-stack    Profile c/c++ stack together with python stack\n"
      "  -d, --dump               Dump stacks from all threads (implies --threads)\n"
 #else
      "  -d, --dump               Dump the current interpreter stack\n"
