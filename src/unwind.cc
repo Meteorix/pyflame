@@ -27,6 +27,11 @@ std::string string_format(const std::string fmt, ...){
 void Unwinder::InitUnwind(pid_t pid){
   unw_as_ = unw_create_addr_space(&_UPT_accessors, 0);
   unw_context_ = _UPT_create(pid);  // todo: reuse context & as?
+
+  int r = unw_set_caching_policy(unw_as_, UNW_CACHE_GLOBAL);
+  if (r != 0){
+    std::cerr << "ERROR: cannot set caching policy\n";
+  }
 }
 
 void Unwinder::DestoryUnwind(){
